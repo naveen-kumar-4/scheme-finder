@@ -3,24 +3,21 @@ from pymongo import MongoClient
 from bson.objectid import ObjectId
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
+import os
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"   # change later in production
+app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")  # change in production
 
 # ---------------- MongoDB Connection ----------------
-import os
-from pymongo import MongoClient
-
 MONGO_URI = os.environ.get("MONGO_URI")
+if not MONGO_URI:
+    raise Exception("MONGO_URI environment variable not set")
+
 client = MongoClient(MONGO_URI)
-
-db = client["scheme_db"]
-db = client["gov_schemes"]
-
+db = client["gov_schemes"]  # Use the DB name in Atlas
 collection = db["schemes"]
 saved_collection = db["saved_schemes"]
-users_collection = db["users"]   # NEW
-
+users_collection = db["users"]
 
 # =====================================================
 # ---------------- AUTH SYSTEM ------------------------
@@ -29,7 +26,6 @@ users_collection = db["users"]   # NEW
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-
         name = request.form.get("name")
         email = request.form.get("email")
         password = request.form.get("password")
@@ -38,13 +34,11 @@ def register():
             return "Email already exists"
 
         hashed_password = generate_password_hash(password)
-
         users_collection.insert_one({
             "name": name,
             "email": email,
             "password": hashed_password
         })
-
         return redirect("/login")
 
     return render_template("register.html")
@@ -53,7 +47,6 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-
         email = request.form.get("email")
         password = request.form.get("password")
 
@@ -98,7 +91,6 @@ def dashboard():
 # =====================================================
 
 def match_schemes(filters):
-
     age = filters.get("age")
     gender = filters.get("gender", "").lower()
     category = filters.get("category", "").lower()
@@ -110,7 +102,6 @@ def match_schemes(filters):
     matched_schemes = []
 
     for scheme in all_schemes:
-
         searchable_text = " ".join([
             str(scheme.get("scheme_name", "")),
             str(scheme.get("details", "")),
@@ -124,13 +115,10 @@ def match_schemes(filters):
         ]).lower()
 
         score = 0
-
         if occupation and occupation in searchable_text:
             score += 3
-
         if category and category in searchable_text:
             score += 2
-
         if gender and gender in searchable_text:
             score += 1
 
@@ -148,7 +136,6 @@ def match_schemes(filters):
             try:
                 age_val = int(age)
                 eligibility_text = str(scheme.get("eligibility", "")).lower()
-
                 if str(age_val) in eligibility_text:
                     score += 2
                 if "student" in eligibility_text and age_val <= 25:
@@ -164,7 +151,6 @@ def match_schemes(filters):
             matched_schemes.append(scheme_copy)
 
     matched_schemes.sort(key=lambda x: x.get("match_score", 0), reverse=True)
-
     return matched_schemes if matched_schemes else all_schemes
 
 
@@ -174,12 +160,10 @@ def match_schemes(filters):
 
 @app.route("/")
 def home():
-
     search_query = request.args.get("search", "").strip()
 
     if search_query:
         words = re.split(r"\s+", search_query)
-
         query_conditions = []
         for word in words:
             regex = {"$regex": word, "$options": "i"}
@@ -195,7 +179,6 @@ def home():
                     {"scheme_status": regex}
                 ]
             })
-
         all_schemes = list(collection.find({"$and": query_conditions}))
     else:
         all_schemes = list(collection.find())
@@ -221,10 +204,8 @@ def home():
 def api_search():
     filters = request.json
     matched = match_schemes(filters)
-
     for scheme in matched:
         scheme["_id"] = str(scheme["_id"])
-
     return jsonify(matched)
 
 
@@ -236,20 +217,16 @@ def api_search():
 def scheme_details(scheme_id):
     try:
         scheme = collection.find_one({"_id": ObjectId(scheme_id)})
-
         if not scheme:
             return "Scheme not found", 404
-
         scheme["_id"] = str(scheme["_id"])
         existing = saved_collection.find_one({"scheme_id": scheme_id})
         is_saved = True if existing else False
-
         return render_template("save_scheme.html",
                                scheme=scheme,
                                is_saved=is_saved)
     except:
         return "Invalid Scheme ID", 400
-
 
 
 # =====================================================
@@ -258,88 +235,32 @@ def scheme_details(scheme_id):
 
 @app.route("/save_scheme", methods=["POST"])
 def save_scheme():
-
     if "user_id" not in session:
         return {"status": "login_required"}
 
     data = request.json
     scheme_id = data.get("scheme_id")
 
-    # Prevent duplicate saves
     existing = saved_collection.find_one({
         "scheme_id": scheme_id,
         "user_id": session["user_id"]
     })
-
     if existing:
         return {"status": "exists"}
 
-    # Just store reference instead of full scheme
     saved_collection.insert_one({
         "scheme_id": scheme_id,
         "user_id": session["user_id"]
     })
-
     return {"status": "success"}
 
-# =====================================================
-# ---------------- VIEW SAVED -------------------------
-# =====================================================
 
-from bson import ObjectId
-
-@app.route("/saved_schemes")
-def view_saved():
-
-    if "user_id" not in session:
-        return redirect("/login")
-
-    search_query = request.args.get("search", "")
-
-    # Step 1: Get all saved scheme_ids for this user
-    saved_items = list(saved_collection.find({
-        "user_id": session["user_id"]
-    }))
-
-    scheme_ids = [item["scheme_id"] for item in saved_items]
-
-    # Step 2: If no saved schemes
-    if not scheme_ids:
-        return render_template(
-            "saved_schemes.html",
-            schemes=[],
-            search_query=search_query
-        )
-
-    # Step 3: Fetch full scheme details
-    query = {"_id": {"$in": scheme_ids}}   # ✅ NO ObjectId
-
-    if search_query:
-        query["$or"] = [
-            {"scheme_name": {"$regex": search_query, "$options": "i"}},
-            {"details": {"$regex": search_query, "$options": "i"}},
-            {"benefits": {"$regex": search_query, "$options": "i"}},
-            {"eligibility": {"$regex": search_query, "$options": "i"}},
-            {"schemeCategory": {"$regex": search_query, "$options": "i"}},
-            {"applicable_state": {"$regex": search_query, "$options": "i"}}
-        ]
-
-    # ✅ IMPORTANT: use schemes_collection
-    full_schemes = list(saved_collection.find(query))
-
-    return render_template(
-        "saved_schemes.html",
-        schemes=full_schemes,
-        search_query=search_query
-    )
 # =====================================================
 # ---------------- DELETE SAVED -----------------------
 # =====================================================
 
-
 @app.route("/delete_saved/<scheme_id>", methods=["POST"])
 def delete_saved(scheme_id):
-
     if "user_id" not in session:
         return {"status": "login_required"}
 
@@ -347,15 +268,16 @@ def delete_saved(scheme_id):
         "scheme_id": scheme_id,
         "user_id": session["user_id"]
     })
-
     return {"status": "deleted"}
 
 
+# =====================================================
+# ---------------- ELIGIBILITY API --------------------
+# =====================================================
+
 @app.route("/api/eligibility", methods=["POST"])
 def check_eligibility():
-
     data = request.get_json()
-
     age = data.get("age")
     gender = data.get("gender")
     category = data.get("category")
@@ -371,72 +293,42 @@ def check_eligibility():
 
     # State filter (only if State level selected)
     if level == "State" and state:
-        query["applicable_state"] = {
-            "$regex": state,
-            "$options": "i"
-        }
+        query["applicable_state"] = {"$regex": state, "$options": "i"}
 
-    # Build OR conditions (soft matching)
+    # OR conditions (eligibility soft match)
     or_conditions = []
-
     if occupation:
-        or_conditions.append({
-            "eligibility": {"$regex": occupation, "$options": "i"}
-        })
-
+        or_conditions.append({"eligibility": {"$regex": occupation, "$options": "i"}})
     if category:
-        or_conditions.append({
-            "eligibility": {"$regex": category, "$options": "i"}
-        })
-
+        or_conditions.append({"eligibility": {"$regex": category, "$options": "i"}})
     if gender:
-        or_conditions.append({
-            "eligibility": {"$regex": gender, "$options": "i"}
-        })
-
+        or_conditions.append({"eligibility": {"$regex": gender, "$options": "i"}})
     if age:
-        or_conditions.append({
-            "eligibility": {"$regex": str(age), "$options": "i"}
-        })
+        or_conditions.append({"eligibility": {"$regex": str(age), "$options": "i"}})
 
     if or_conditions:
         query["$or"] = or_conditions
 
-    # First attempt → strict query
-    matched_schemes = list(saved_collection.find(query).limit(20))
+    matched_schemes = list(collection.find(query).limit(20))
 
-    # If nothing found → relax filters (remove eligibility matching)
+    # Relax filters if nothing found
     if len(matched_schemes) == 0:
         relaxed_query = {}
-
         if level:
             relaxed_query["level"] = level
-
         if level == "State" and state:
-            relaxed_query["applicable_state"] = {
-                "$regex": state,
-                "$options": "i"
-            }
+            relaxed_query["applicable_state"] = {"$regex": state, "$options": "i"}
+        matched_schemes = list(collection.find(relaxed_query).limit(20))
 
-        matched_schemes = list(
-            saved_collection.find(relaxed_query).limit(20)
-        )
-
-    # If STILL nothing → return latest 10 schemes
     if len(matched_schemes) == 0:
-        matched_schemes = list(
-            saved_collection.find().limit(10)
-        )
+        matched_schemes = list(collection.find().limit(10))
 
-    # Convert ObjectId to string
     for scheme in matched_schemes:
         scheme["_id"] = str(scheme["_id"])
 
     return jsonify(matched_schemes)
 
+
 # ---------------- RUN SERVER ----------------
-import os
-
 if __name__ == "__main__":
-
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
