@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Government Scheme Finder</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+body { font-family: 'Inter', sans-serif; }
+</style>
+</head>
+
+<body class="bg-gradient-to-br from-slate-100 to-indigo-100 min-h-screen relative">
+
+<!-- OVERLAY -->
+<div id="overlay" class="fixed inset-0 bg-black bg-opacity-40 hidden z-40" onclick="toggleMenu()"></div>
+
+<!-- SIDEBAR -->
+<div id="sidebar"
+     class="fixed top-0 left-0 h-full w-64 bg-white shadow-xl transform -translate-x-full transition-transform duration-300 z-50">
+
+    <div class="p-6 border-b">
+        <h2 class="text-xl font-bold text-indigo-800">🏛 Menu</h2>
+    </div>
+
+    <ul class="p-6 space-y-4 text-gray-700 font-medium">
+
+        <li><a href="/" class="hover:text-indigo-600">🏠 Home</a></li>
+
+        <li>
+            <button onclick="showEligibility()" class="hover:text-indigo-600">
+                ✅ Check Eligibility
+            </button>
+        </li>
+
+        {% if session.get("user_id") %}
+            <li><a href="/dashboard" class="hover:text-indigo-600">📊 Dashboard</a></li>
+            <li><a href="/saved_schemes" class="hover:text-indigo-600">⭐ Saved Schemes</a></li>
+            <li><a href="/logout" class="text-red-500 hover:text-red-700">🚪 Logout</a></li>
+        {% else %}
+            <li><a href="/login" class="hover:text-indigo-600">🔐 Login</a></li>
+            <li><a href="/register" class="hover:text-indigo-600">📝 Register</a></li>
+        {% endif %}
+
+    </ul>
+</div>
+
+
+<!-- NAVBAR -->
+<header class="bg-indigo-800 text-white shadow-lg relative z-30">
+    <div class="container mx-auto flex items-center justify-between px-6 py-4">
+
+        <button onclick="toggleMenu()" class="text-3xl focus:outline-none">
+            ☰
+        </button>
+
+        <h1 class="text-xl md:text-2xl font-bold text-center flex-1">
+            🇮🇳 Government Scheme Finder
+        </h1>
+
+        <div class="w-8"></div>
+    </div>
+</header>
+
+
+<main class="container mx-auto px-4 py-10 max-w-6xl">
+
+<!-- SEARCH -->
+<section class="bg-white shadow-lg rounded-2xl p-6 mb-8">
+<h2 class="text-lg font-semibold mb-4">🔎 Search Schemes</h2>
+
+<form method="GET" action="/" class="flex gap-4">
+    <input type="text" name="search"
+           value="{{ search_query }}"
+           placeholder="Search by name, benefits, eligibility..."
+           class="w-full border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+
+    <button type="submit"
+            class="bg-indigo-600 text-white px-6 py-2 rounded-xl hover:bg-indigo-700 transition shadow">
+        Search
+    </button>
+</form>
+</section>
+
+
+<!-- ELIGIBILITY SECTION -->
+<section id="eligibilitySection" class="bg-white shadow-lg rounded-2xl p-8 mb-10 hidden">
+
+<h2 class="text-xl font-semibold mb-6 border-b pb-2">
+Check Your Eligibility
+</h2>
+
+<form id="schemeForm" class="grid md:grid-cols-3 gap-6">
+
+<div>
+<label class="block text-sm font-medium">Age</label>
+<input type="number" name="age" class="w-full border rounded-xl px-3 py-2" required>
+</div>
+
+<div>
+<label class="block text-sm font-medium">Annual Income (₹)</label>
+<input type="number" name="income" class="w-full border rounded-xl px-3 py-2" required>
+</div>
+
+<div>
+<label class="block text-sm font-medium">Employment Type</label>
+<select name="employment" class="w-full border rounded-xl px-3 py-2" required>
+<option value="">Select</option>
+<option>Self Employed</option>
+<option>Government Employee</option>
+<option>Private Employee</option>
+<option>Unemployed</option>
+<option>Student</option>
+</select>
+</div>
+
+<div>
+<label class="block text-sm font-medium">Scheme Level</label>
+<select name="level" id="levelSelect" class="w-full border rounded-xl px-3 py-2" required>
+<option value="">Select</option>
+<option>State</option>
+<option>Central</option>
+</select>
+</div>
+
+<div id="stateField" class="hidden">
+<label class="block text-sm font-medium">Select State</label>
+<select name="state" class="w-full border rounded-xl px-3 py-2">
+<option value="">Select</option>
+<option>Andhra Pradesh</option>
+<option>Telangana</option>
+<option>Tamil Nadu</option>
+<option>Karnataka</option>
+<option>Kerala</option>
+<option>Maharashtra</option>
+</select>
+</div>
+
+<div class="md:col-span-3">
+<button type="submit"
+class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl shadow transition">
+Find Matching Schemes
+</button>
+</div>
+
+</form>
+</section>
+
+
+<!-- RESULTS -->
+<section>
+<h3 class="text-2xl font-bold mb-6">Available Schemes</h3>
+<div id="results" class="grid gap-6">
+
+{% for scheme in ongoing_schemes %}
+<div class="bg-white p-6 rounded-2xl shadow-lg border-l-8 border-green-500">
+    <h2 class="text-xl font-bold text-indigo-900 mb-2">
+        {{ scheme.scheme_name }}
+    </h2>
+
+    <p class="text-gray-700">
+        <b>Benefits:</b> {{ scheme.benefits }}
+    </p>
+
+    <div class="mt-4">
+        <a href="/scheme/{{ scheme._id }}"
+           class="bg-indigo-600 text-white px-4 py-2 rounded-xl">
+           View Details
+        </a>
+    </div>
+</div>
+{% endfor %}
+
+</div>
+</section>
+
+</main>
+
+
+<script>
+function toggleMenu() {
+    document.getElementById("sidebar").classList.toggle("-translate-x-full");
+    document.getElementById("overlay").classList.toggle("hidden");
+}
+
+function showEligibility() {
+    toggleMenu();
+    const section = document.getElementById("eligibilitySection");
+    section.classList.remove("hidden");
+    section.scrollIntoView({ behavior: "smooth" });
+}
+
+document.getElementById("levelSelect").addEventListener("change", function(){
+    const stateField = document.getElementById("stateField");
+    if(this.value === "State"){
+        stateField.classList.remove("hidden");
+    } else {
+        stateField.classList.add("hidden");
+    }
+});
+
+
+document.getElementById("schemeForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+
+    fetch("/api/eligibility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            age: formData.get("age"),
+            income: formData.get("income"),
+            employment: formData.get("employment"),
+            level: formData.get("level"),
+            state: formData.get("state")
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        const resultsDiv = document.getElementById("results");
+        resultsDiv.innerHTML = "";
+
+        if (data.length === 0) {
+            resultsDiv.innerHTML = `
+                <div class="bg-yellow-100 p-6 rounded-xl text-center shadow">
+                    <h2 class="text-lg font-semibold text-yellow-700">
+                        ⚠ No matching schemes found
+                    </h2>
+                    <p class="text-gray-600 mt-2">
+                        Try adjusting your age, income or employment type.
+                    </p>
+                </div>
+            `;
+            return;
+        }
+
+        data.forEach(scheme => {
+            resultsDiv.innerHTML += `
+                <div class="bg-white p-6 rounded-2xl shadow-lg border-l-8 border-green-500">
+                    <h2 class="text-xl font-bold text-indigo-900 mb-2">
+                        ${scheme.scheme_name}
+                    </h2>
+                    <p><b>Benefits:</b> ${scheme.benefits}</p>
+                    <div class="mt-4">
+                        <a href="/scheme/${scheme._id}"
+                           class="bg-indigo-600 text-white px-4 py-2 rounded-xl">
+                           View Details
+                        </a>
+                    </div>
+                </div>
+            `;
+        });
+
+    });
+});
+</script>
+
+</body>
+</html>

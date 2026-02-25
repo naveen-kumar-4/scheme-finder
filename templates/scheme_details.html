@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scheme Details</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+body { font-family: 'Inter', sans-serif; }
+</style>
+
+</head>
+
+<body class="bg-slate-100 min-h-screen">
+
+<header class="bg-indigo-800 text-white py-6 shadow-lg">
+    <div class="container mx-auto text-center">
+        <h1 class="text-2xl font-bold">🏛 Scheme Details</h1>
+    </div>
+</header>
+
+<main class="container mx-auto px-4 py-10 max-w-4xl">
+
+<div class="bg-white shadow-lg rounded-xl p-8">
+
+<h2 class="text-2xl font-bold text-indigo-900 mb-6">
+{{ scheme["scheme_name"] }}
+</h2>
+
+<div class="space-y-5 text-sm">
+
+<div class="bg-slate-50 p-4 rounded">
+<p class="font-semibold text-gray-600">Description</p>
+<p>{{ scheme["details"] }}</p>
+</div>
+
+<div class="bg-green-50 p-4 rounded">
+<p class="font-semibold text-green-700">Benefits</p>
+<p>{{ scheme["benefits"] }}</p>
+</div>
+
+<div class="bg-yellow-50 p-4 rounded">
+<p class="font-semibold text-yellow-700">Eligibility</p>
+<p>{{ scheme["eligibility"] }}</p>
+</div>
+
+<div class="bg-blue-50 p-4 rounded">
+<p class="font-semibold text-blue-700">Category</p>
+<p>{{ scheme["schemeCategory"] }}</p>
+</div>
+
+</div>
+
+{% if scheme["official_link"] %}
+<a href="{{ scheme['official_link'] }}" target="_blank"
+class="inline-block mt-6 bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700">
+Apply on Official Website
+</a>
+{% endif %}
+
+<!-- SAVE BUTTON -->
+<div class="mt-6">
+<button onclick="saveScheme()"
+class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700">
+💾 Save Scheme
+</button>
+</div>
+
+<div class="mt-6">
+<a href="/" class="text-indigo-600 hover:underline">
+⬅ Back to Home
+</a>
+</div>
+
+</div>
+
+</main>
+
+<footer class="text-center py-6 text-gray-400 text-sm">
+© 2026 Government Scheme Portal
+</footer>
+
+<script>
+function saveScheme() {
+
+    fetch("/save_scheme", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            scheme_id: "{{ scheme['_id'] }}"
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        if (data.status === "login_required") {
+            alert("Please login first.");
+        }
+        else if (data.status === "exists") {
+            alert("Already saved!");
+        }
+        else if (data.status === "success") {
+            alert("Scheme saved successfully!");
+        }
+    });
+}
+</script>
+
+</body>
+</html>

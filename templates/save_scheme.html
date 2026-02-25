@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ scheme.scheme_name }}</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-100 min-h-screen">
+
+<!-- Header -->
+<header class="bg-indigo-800 text-white py-6 shadow">
+    <div class="container mx-auto text-center">
+        <h1 class="text-2xl font-bold">Scheme Details</h1>
+    </div>
+</header>
+
+
+<main class="container mx-auto px-4 py-10 max-w-4xl">
+
+<!-- Scheme Card -->
+<div class="bg-white p-8 rounded-xl shadow">
+
+<h2 class="text-3xl font-bold text-indigo-900 mb-4">
+    {{ scheme.get("scheme_name","Untitled") }}
+</h2>
+
+<p class="text-gray-600 mb-6">
+    {{ scheme.get("details","No details available") }}
+</p>
+
+
+<!-- Info Grid -->
+<div class="grid md:grid-cols-2 gap-6">
+
+<div class="bg-green-50 p-4 rounded">
+<h3 class="font-semibold text-green-700">Benefits</h3>
+<p>{{ scheme.get("benefits","Not Available") }}</p>
+</div>
+
+<div class="bg-yellow-50 p-4 rounded">
+<h3 class="font-semibold text-yellow-700">Eligibility</h3>
+<p>{{ scheme.get("eligibility","Not Available") }}</p>
+</div>
+
+<div class="bg-blue-50 p-4 rounded">
+<h3 class="font-semibold text-blue-700">Documents Required</h3>
+<p>{{ scheme.get("documents_required","Not Available") }}</p>
+</div>
+
+<div class="bg-purple-50 p-4 rounded">
+<h3 class="font-semibold text-purple-700">Applicable State</h3>
+<p>{{ scheme.get("applicable_state","Not Available") }}</p>
+</div>
+
+</div>
+
+
+<!-- Buttons -->
+<div class="mt-8 flex gap-4">
+
+{% if scheme.get("official_link") %}
+<a href="{{ scheme.get('official_link') }}" target="_blank"
+class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">
+Apply / Official Portal
+</a>
+{% endif %}
+
+<button onclick="saveScheme('{{ scheme._id }}')"
+class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+Save Scheme
+</button>
+
+<a href="/"
+class="bg-gray-300 px-6 py-2 rounded-lg hover:bg-gray-400">
+Back
+</a>
+
+</div>
+
+</div>
+
+</main>
+
+
+<!-- Save Script -->
+<script>
+
+async function saveScheme(id){
+
+    try{
+
+        const response = await fetch("/save_scheme", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                scheme_id: id
+            })
+        });
+
+        const result = await response.json();
+
+        if(result.status === "success"){
+            alert("✅ Scheme saved successfully!");
+        }
+        else if(result.status === "error"){
+            alert("⚠️ " + (result.message || "Error saving scheme"));
+        }
+
+    }
+    catch(error){
+        alert("❌ Error saving scheme");
+        console.error(error);
+    }
+}
+
+</script>
+
+
+</body>
+</html>
