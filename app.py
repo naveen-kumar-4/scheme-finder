@@ -8,7 +8,13 @@ app = Flask(__name__)
 app.secret_key = "supersecretkey"   # change later in production
 
 # ---------------- MongoDB Connection ----------------
-client = MongoClient("mongodb://localhost:27017/")
+import os
+from pymongo import MongoClient
+
+MONGO_URI = os.environ.get("MONGO_URI")
+client = MongoClient(MONGO_URI)
+
+db = client["scheme_db"]
 db = client["gov_schemes"]
 
 collection = db["schemes"]
@@ -432,4 +438,5 @@ def check_eligibility():
 import os
 
 if __name__ == "__main__":
+
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
