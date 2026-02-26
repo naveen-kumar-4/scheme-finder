@@ -115,15 +115,22 @@ def home():
     else:
         all_schemes = list(collection.find())
 
+    # Convert ObjectId to string
     for s in all_schemes:
         s["_id"] = str(s["_id"])
 
+    # Filter by status
+    ongoing = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "ongoing"]
+    upcoming = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "upcoming"]
+    expired = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "expired"]
+
     return render_template(
         "index.html",
-        schemes=all_schemes,
+        ongoing_schemes=ongoing,
+        upcoming_schemes=upcoming,
+        expired_schemes=expired,
         search_query=search_query
     )
-
 
 # =====================================================
 # ---------------- VIEW SCHEME DETAILS ----------------
