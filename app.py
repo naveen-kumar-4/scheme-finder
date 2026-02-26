@@ -89,49 +89,42 @@ def dashboard():
 # =====================================================
 # ---------------- HOME SEARCH ------------------------
 # =====================================================
-
 @app.route("/")
 def home():
-    search_query = request.args.get("search", "").strip()
+search_query = request.args.get("search", "").strip()
 
-    if search_query:
-        words = re.split(r"\s+", search_query)
-        query_conditions = []
-        for word in words:
-            regex = {"$regex": word, "$options": "i"}
-            query_conditions.append({
-                "$or": [
-                    {"scheme_name": regex},
-                    {"details": regex},
-                    {"benefits": regex},
-                    {"eligibility": regex},
-                    {"schemeCategory": regex},
-                    {"applicable_state": regex},
-                    {"documents_required": regex},
-                    {"scheme_status": regex}
-                ]
-            })
-        all_schemes = list(collection.find({"$and": query_conditions}))
-    else:
-        all_schemes = list(collection.find())
+if search_query:  
+    words = re.split(r"\s+", search_query)  
+    query_conditions = []  
+    for word in words:  
+        regex = {"$regex": word, "$options": "i"}  
+        query_conditions.append({  
+            "$or": [  
+                {"scheme_name": regex},  
+                {"details": regex},  
+                {"benefits": regex},  
+                {"eligibility": regex},  
+                {"schemeCategory": regex},  
+                {"applicable_state": regex},  
+                {"documents_required": regex},  
+                {"scheme_status": regex}  
+            ]  
+        })  
+    all_schemes = list(collection.find({"$and": query_conditions}))  
+else:  
+    all_schemes = list(collection.find())  
 
-    # Convert ObjectId to string
-    for s in all_schemes:
-        s["_id"] = str(s["_id"])
+ongoing = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "ongoing"]  
+upcoming = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "upcoming"]  
+expired = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "expired"]  
 
-    # Filter by status
-    ongoing = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "ongoing"]
-    upcoming = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "upcoming"]
-    expired = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "expired"]
-
-    return render_template(
-        "index.html",
-        ongoing_schemes=ongoing,
-        upcoming_schemes=upcoming,
-        expired_schemes=expired,
-        search_query=search_query
-    )
-
+return render_template(  
+    "index.html",  
+    ongoing_schemes=ongoing,  
+    upcoming_schemes=upcoming,  
+    expired_schemes=expired,  
+    search_query=search_query  
+)
 # =====================================================
 # ---------------- VIEW SCHEME DETAILS ----------------
 # =====================================================
@@ -275,3 +268,4 @@ def check_eligibility():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
