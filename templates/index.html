@@ -157,7 +157,7 @@
                     {% if status == 'expired' %}
                         <button disabled class="flex-1 bg-slate-200 text-slate-500 py-4 rounded-2xl font-black text-sm uppercase cursor-not-allowed">Closed</button>
                     {% else %}
-                        <a href="/scheme/{{ scheme._id }}" class="flex-1 bg-indigo-600 text-white text-center py-4 rounded-2xl font-black text-sm uppercase hover:bg-indigo-700 shadow-lg transition-all">Apply</a>
+                        <a href="/scheme/{{ scheme._id }}" class="flex-1 bg-indigo-600 text-white text-center py-4 rounded-2xl font-black text-sm uppercase hover:bg-indigo-700 shadow-lg transition-all">View details</a>
                     {% endif %}
 
                     <button onclick="saveScheme('{{ scheme._id }}', this)" class="h-14 w-14 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all">
@@ -257,3 +257,4 @@
 
 </body>
 </html>
+
