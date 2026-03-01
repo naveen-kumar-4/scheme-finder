@@ -1,55 +1,87 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Register - Scheme Finder</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account | SchemeFinder</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass-card { 
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .gradient-bg {
+            background: radial-gradient(circle at top left, #eef2ff, #f3f7fa, #e0e7ff);
+        }
+    </style>
 </head>
-<body class="bg-indigo-100 flex items-center justify-center min-h-screen">
+<body class="gradient-bg min-h-screen flex items-center justify-center p-6">
 
-<div class="bg-white p-8 rounded-xl shadow-lg w-96">
-    
-    <h2 class="text-2xl font-bold mb-6 text-center text-indigo-700">
-        📝 Create Account
-    </h2>
-
-    <form method="POST" action="/register">
-
-        <div class="mb-4">
-            <label class="block text-sm font-medium">Username</label>
-            <input type="text" name="username"
-                   class="w-full border rounded-lg px-3 py-2"
-                   required>
+    <div class="w-full max-w-md">
+        <div class="text-center mb-8">
+            <div class="inline-block p-4 bg-white rounded-3xl shadow-xl shadow-indigo-100 mb-4">
+                <span class="text-4xl">📝</span>
+            </div>
+            <h1 class="text-3xl font-black text-slate-900 tracking-tight">Create Account</h1>
+            <p class="text-slate-500 font-medium mt-2">Join thousands of citizens finding benefits</p>
         </div>
 
-        <div class="mb-4">
-            <label class="block text-sm font-medium">Email</label>
-            <input type="email" name="email"
-                   class="w-full border rounded-lg px-3 py-2"
-                   required>
+        <div class="glass-card p-10 rounded-[2.5rem] shadow-2xl shadow-indigo-200/50">
+            <form method="POST" action="/register" class="space-y-5">
+                
+                <div class="space-y-2">
+                    <label class="block text-xs font-black text-indigo-400 uppercase tracking-widest ml-1">
+                        Full Name
+                    </label>
+                    <input type="text" name="name" 
+                           placeholder="John Doe"
+                           class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none transition-all placeholder:text-slate-300" 
+                           required>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-xs font-black text-indigo-400 uppercase tracking-widest ml-1">
+                        Email Address
+                    </label>
+                    <input type="email" name="email" 
+                           placeholder="john@example.com"
+                           class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none transition-all placeholder:text-slate-300" 
+                           required>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-xs font-black text-indigo-400 uppercase tracking-widest ml-1">
+                        Create Password
+                    </label>
+                    <input type="password" name="password" 
+                           placeholder="••••••••"
+                           class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none transition-all placeholder:text-slate-300" 
+                           required>
+                </div>
+
+                <button type="submit" 
+                        class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-wider hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all hover:scale-[1.02] active:scale-95 mt-4">
+                    Register Now
+                </button>
+            </form>
+
+            <div class="mt-8 text-center">
+                <p class="text-slate-500 text-sm font-bold">
+                    Already have an account? 
+                    <a href="/login" class="text-indigo-600 hover:underline ml-1">Login here</a>
+                </p>
+            </div>
         </div>
 
-        <div class="mb-6">
-            <label class="block text-sm font-medium">Password</label>
-            <input type="password" name="password"
-                   class="w-full border rounded-lg px-3 py-2"
-                   required>
+        <div class="text-center mt-8">
+            <a href="/" class="text-slate-400 hover:text-indigo-600 text-sm font-bold transition-colors">
+                ← Back to Scheme Explorer
+            </a>
         </div>
-
-        <button type="submit"
-                class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition">
-            Register
-        </button>
-
-    </form>
-
-    <p class="text-sm text-center mt-4">
-        Already have an account?
-        <a href="/login" class="text-indigo-600 font-semibold">
-            Login
-        </a>
-    </p>
-
-</div>
+    </div>
 
 </body>
 </html>
