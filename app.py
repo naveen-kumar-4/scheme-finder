@@ -196,6 +196,7 @@ def save_scheme():
 # ---------------- VIEW SAVED SCHEMES -----------------
 # =====================================================
 
+
 @app.route("/saved_schemes")
 def view_saved():
     if "user_id" not in session:
@@ -205,15 +206,19 @@ def view_saved():
         "user_id": session["user_id"]
     }))
 
-    scheme_ids = [item["scheme_id"] for item in saved_items]
-
-    if not scheme_ids:
+    if not saved_items:
         return render_template("saved_schemes.html", schemes=[])
 
-    object_ids = [ObjectId(sid) for sid in scheme_ids]
+    scheme_ids = []
+
+    for item in saved_items:
+        try:
+            scheme_ids.append(ObjectId(item["scheme_id"]))
+        except:
+            scheme_ids.append(item["scheme_id"])
 
     full_schemes = list(collection.find({
-        "_id": {"$in": object_ids}
+        "_id": {"$in": scheme_ids}
     }))
 
     for scheme in full_schemes:
@@ -223,7 +228,6 @@ def view_saved():
         "saved_schemes.html",
         schemes=full_schemes
     )
-
 
 # =====================================================
 # ---------------- DELETE / UNSAVE --------------------
@@ -274,5 +278,6 @@ def check_eligibility():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 
 
