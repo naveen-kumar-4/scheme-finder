@@ -1,260 +1,478 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scheme Finder | Government Portal</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; scroll-behavior: smooth; }
-        
-        /* Background Styling */
-        .map-bg { 
-            background: linear-gradient(rgba(243, 247, 250, 0.85), rgba(243, 247, 250, 0.85)), 
-                        url('https://thumbs.dreamstime.com/b/map-india-indian-flag-350693171.jpg');
-            background-attachment: fixed;
-            background-size: cover;
-            background-position: center;
-        }
+from flask import Flask, render_template, request, jsonify, redirect, session
+from pymongo import MongoClient
+from bson.objectid import ObjectId
+from werkzeug.security import generate_password_hash, check_password_hash
+import re
 
-        /* Glassmorphism for Cards */
-        .scheme-card { 
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-        }
-        
-        .scheme-card:hover { 
-            transform: translateY(-12px); 
-            background: rgba(255, 255, 255, 0.9);
-            box-shadow: 0 25px 50px -12px rgba(30, 58, 138, 0.15);
-        }
+app = Flask(__name__)
+app.secret_key = "supersecretkey"   # change later in production
 
-        .glass-nav { background: rgba(30, 58, 138, 0.95); backdrop-filter: blur(12px); }
-        .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+# ---------------- MongoDB Connection ----------------
+client = MongoClient("mongodb://localhost:27017/")
+db = client["gov_schemes"]
 
-        /* Save Button Pulse Effect */
-        .btn-save-active { color: #ef4444 !important; border-color: #fecaca !important; background: #fef2f2 !important; }
-    </style>
-</head>
-<body class="map-bg min-h-screen">
+collection = db["schemes"]
+saved_collection = db["saved_schemes"]
+users_collection = db["users"]   # NEW
 
-<div id="overlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-40" onclick="toggleMenu()"></div>
 
-<div id="sidebar" class="fixed top-0 left-0 h-full w-72 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 z-50 rounded-r-[2.5rem]">
-    <div class="p-8 border-b flex justify-between items-center">
-        <h2 class="text-2xl font-black text-indigo-900 tracking-tight">Menu</h2>
-        <button onclick="toggleMenu()" class="h-10 w-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-red-500 transition-all">✕</button>
-    </div>
-    <ul class="p-8 space-y-6 text-slate-600 font-bold">
-        <li><a href="/" class="flex items-center gap-4 p-3 rounded-2xl hover:bg-indigo-50 hover:text-indigo-600 transition"><span>🏠</span> Home</a></li>
-        <li><button onclick="showEligibility()" class="w-full flex items-center gap-4 p-3 rounded-2xl hover:bg-indigo-50 hover:text-indigo-600 transition text-left"><span>✅</span> Eligibility</button></li>
-        
-        {% if session.get("user_id") %}
-            <li><a href="/saved_schemes" class="flex items-center gap-4 p-3 rounded-2xl hover:bg-indigo-50 hover:text-indigo-600 transition"><span>⭐</span> Saved Schemes</a></li>
-            <li><a href="/dashboard" class="flex items-center gap-4 p-3 rounded-2xl hover:bg-indigo-50 hover:text-indigo-600 transition"><span>📊</span> Dashboard</a></li>
-            <li class="pt-6 border-t"><a href="/logout" class="flex items-center gap-4 p-3 rounded-2xl text-rose-500 hover:bg-rose-50 transition"><span>🚪</span> Logout</a></li>
-        {% else %}
-            <li><a href="/login" class="flex items-center gap-4 p-3 rounded-2xl hover:bg-indigo-50 hover:text-indigo-600 transition"><span>🔐</span> Login</a></li>
-            <li><a href="/register" class="flex items-center gap-4 p-3 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200"><span>📝</span> Join Now</a></li>
-        {% endif %}
-    </ul>
-</div>
+# =====================================================
+# ---------------- AUTH SYSTEM ------------------------
+# =====================================================
 
-<header class="glass-nav text-white sticky top-0 z-30 shadow-lg">
-    <div class="container mx-auto flex items-center justify-between px-6 py-4">
-        <button onclick="toggleMenu()" class="p-2 hover:bg-white/10 rounded-xl transition text-2xl">☰</button>
-        <div class="flex items-center gap-3">
-            <span class="text-3xl">🇮🇳</span>
-            <h1 class="text-xl md:text-2xl font-black tracking-tighter uppercase">Scheme<span class="text-indigo-300">Finder</span></h1>
-        </div>
-        <div class="hidden md:flex gap-2">
-            <div class="h-10 w-10 bg-white/10 rounded-full border border-white/20 flex items-center justify-center text-xs font-bold">
-                {{ session.get("username", "U")[0] if session.get("user_id") else "G" }}
-            </div>
-        </div>
-    </div>
-</header>
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
 
-<main class="container mx-auto px-6 py-12 max-w-7xl">
+        name = request.form.get("name")
+        email = request.form.get("email")
+        password = request.form.get("password")
 
-    <section class="mb-16">
-        <div class="text-center mb-8">
-            <p class="text-indigo-900 font-bold tracking-[0.2em] uppercase text-sm">Search across thousands of State and Central schemes</p>
-        </div>
-        <form method="GET" action="/" class="bg-white/80 backdrop-blur-md p-3 rounded-[2.5rem] shadow-2xl shadow-indigo-900/10 border border-white/50 flex flex-col md:flex-row gap-3">
-            <input type="text" name="search" value="{{ search_query or '' }}" placeholder="Try 'Farmers subsidy' or 'Student scholarship'..." 
-                   class="flex-1 px-8 py-5 text-lg focus:outline-none rounded-2xl bg-white/50 border-transparent focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
-            <button type="submit" class="bg-indigo-600 text-white px-12 py-5 rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-xl">
-                Search Now
-            </button>
-        </form>
-    </section>
+        if users_collection.find_one({"email": email}):
+            return "Email already exists"
 
-    <section id="eligibilitySection" class="bg-white/90 backdrop-blur-xl shadow-2xl rounded-[3rem] p-10 mb-16 hidden border border-white relative overflow-hidden">
-        <div class="absolute top-0 right-0 p-8 text-6xl opacity-5 pointer-events-none">🎯</div>
-        <div class="flex justify-between items-center mb-10">
-            <h2 class="text-3xl font-black text-slate-800 tracking-tight">Profile Matcher</h2>
-            <button onclick="document.getElementById('eligibilitySection').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold">Close ✕</button>
-        </div>
-        <form id="schemeForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div class="space-y-2">
-                <label class="block text-xs font-black text-indigo-400 uppercase tracking-widest ml-1">Age</label>
-                <input type="number" name="age" class="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none transition-all" placeholder="Enter age" required>
-            </div>
-            <div class="space-y-2">
-                <label class="block text-xs font-black text-indigo-400 uppercase tracking-widest ml-1">Annual Income</label>
-                <input type="number" name="income" class="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none transition-all" placeholder="₹" required>
-            </div>
-            <div class="space-y-2">
-                <label class="block text-xs font-black text-indigo-400 uppercase tracking-widest ml-1">Employment</label>
-                <select name="employment" class="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none transition-all appearance-none cursor-pointer" required>
-                    <option value="">Select Category</option>
-                    <option>Student</option>
-                    <option>Farmer</option>
-                    <option>Unemployed</option>
-                    <option>Self Employed</option>
-                </select>
-            </div>
-            <div class="flex items-end">
-                <button type="submit" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-black hover:bg-black transition-all shadow-xl">Find Matches</button>
-            </div>
-        </form>
-    </section>
+        hashed_password = generate_password_hash(password)
 
-    <section>
-        <div class="flex flex-col md:flex-row justify-between items-end gap-4 mb-10">
-            <div>
-                <h3 class="text-3xl font-black text-slate-900 tracking-tight">Available Schemes</h3>
-                <p class="text-slate-600 font-medium">Find and save your preferred government benefits.</p>
-            </div>
-            <span class="bg-indigo-600 text-white px-6 py-2 rounded-full text-sm font-black shadow-lg">
-                {{ ongoing_schemes|length }} ACTIVE
-            </span>
-        </div>
-        
-        <div id="results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {% for scheme in ongoing_schemes %}
-            <div class="scheme-card rounded-[2.5rem] p-8 flex flex-col relative overflow-hidden">
-                <div class="absolute top-6 right-6">
-                    {% set status = (scheme.scheme_status | default('Ongoing')) | lower %}
-                    <span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.15em] border
-                        {% if status == 'ongoing' %} bg-emerald-500 text-white border-emerald-400
-                        {% elif status == 'expired' %} bg-rose-500 text-white border-rose-400
-                        {% else %} bg-sky-500 text-white border-sky-400 {% endif %}">
-                        {{ scheme.scheme_status or 'Ongoing' }}
-                    </span>
-                </div>
-
-                <div class="mb-8 pt-4">
-                    <h2 class="text-2xl font-black text-slate-900 leading-[1.2] mb-4">{{ scheme.scheme_name }}</h2>
-                    <p class="text-slate-700 text-[15px] font-medium line-clamp-3 leading-relaxed">{{ scheme.benefits }}</p>
-                </div>
-
-                <div class="mt-auto pt-6 border-t border-slate-200/50 flex gap-3">
-                    {% if status == 'expired' %}
-                        <button disabled class="flex-1 bg-slate-200 text-slate-500 py-4 rounded-2xl font-black text-sm uppercase cursor-not-allowed">Closed</button>
-                    {% else %}
-                        <a href="/scheme/{{ scheme._id }}" class="flex-1 bg-indigo-600 text-white text-center py-4 rounded-2xl font-black text-sm uppercase hover:bg-indigo-700 shadow-lg transition-all">View details</a>
-                    {% endif %}
-
-                    <button onclick="saveScheme('{{ scheme._id }}', this)" class="h-14 w-14 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </section>
-</main>
-
-<script>
-    function toggleMenu() {
-        document.getElementById("sidebar").classList.toggle("-translate-x-full");
-        document.getElementById("overlay").classList.toggle("hidden");
-    }
-
-    function showEligibility() {
-        if(!document.getElementById("sidebar").classList.contains("-translate-x-full")) toggleMenu();
-        const section = document.getElementById("eligibilitySection");
-        section.classList.remove("hidden");
-        section.scrollIntoView({ behavior: "smooth" });
-    }
-
-    // FUNCTION TO SAVE SCHEME TO BACKEND
-    async function saveScheme(schemeId, btn) {
-        // Only allow saving if user is logged in (simulated check)
-        const isLoggedIn = "{{ session.get('user_id', '') }}";
-        if (!isLoggedIn) {
-            window.location.href = "/login";
-            return;
-        }
-
-        try {
-            const response = await fetch("/save", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ scheme_id: schemeId })
-            });
-
-            if (response.ok) {
-                // Toggle UI state locally
-                btn.classList.add('btn-save-active');
-                btn.querySelector('svg').setAttribute('fill', 'currentColor');
-                alert("Scheme added to your saved portfolio!");
-            } else {
-                alert("Failed to save scheme. Please try again.");
-            }
-        } catch (error) {
-            console.error("Save error:", error);
-        }
-    }
-
-    // ELIGIBILITY AJAX LOGIC
-    document.getElementById("schemeForm").addEventListener("submit", function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        const resultsDiv = document.getElementById("results");
-        
-        resultsDiv.innerHTML = '<div class="col-span-full text-center py-32"><div class="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-indigo-600 border-r-transparent"></div></div>';
-
-        fetch("/api/eligibility", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                age: formData.get("age"),
-                income: formData.get("income"),
-                employment: formData.get("employment")
-            })
+        users_collection.insert_one({
+            "name": name,
+            "email": email,
+            "password": hashed_password
         })
-        .then(res => res.json())
-        .then(data => {
-            resultsDiv.innerHTML = "";
-            data.forEach(scheme => {
-                const status = (scheme.scheme_status || 'Ongoing').toLowerCase();
-                resultsDiv.innerHTML += `
-                    <div class="scheme-card rounded-[2.5rem] p-8 flex flex-col relative transition-all animate-in fade-in slide-in-from-bottom-8">
-                        <div class="mb-8 pt-4">
-                            <h2 class="text-2xl font-black text-slate-900 leading-[1.2] mb-4">${scheme.scheme_name}</h2>
-                            <p class="text-slate-700 text-[15px] font-medium line-clamp-3 leading-relaxed">${scheme.benefits}</p>
-                        </div>
-                        <div class="mt-auto pt-6 border-t border-slate-200/50 flex gap-3">
-                            <a href="/scheme/${scheme._id}" class="flex-1 bg-indigo-600 text-white text-center py-4 rounded-2xl font-black text-sm uppercase tracking-wider hover:bg-indigo-700 transition-all">Details</a>
-                            <button onclick="saveScheme('${scheme._id}', this)" class="h-14 w-14 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:text-rose-500 transition-all">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-        });
-    });
-</script>
 
-</body>
-</html>
+        return redirect("/login")
 
+    return render_template("register.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+
+        email = request.form.get("email")
+        password = request.form.get("password")
+
+        user = users_collection.find_one({"email": email})
+
+        if user and check_password_hash(user["password"], password):
+            session["user_id"] = str(user["_id"])
+            session["user_name"] = user["name"]
+            return redirect("/dashboard")
+
+        return "Invalid credentials"
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/")
+
+
+# =====================================================
+# ---------------- DASHBOARD --------------------------
+# =====================================================
+
+@app.route("/dashboard")
+def dashboard():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    user_saved = list(saved_collection.find({"user_id": session["user_id"]}))
+
+    return render_template(
+        "dashboard.html",
+        name=session["user_name"],
+        saved=user_saved
+    )
+
+
+# =====================================================
+# ---------------- SMART MATCH FUNCTION ---------------
+# =====================================================
+
+def match_schemes(filters):
+
+    age = filters.get("age")
+    gender = filters.get("gender", "").lower()
+    category = filters.get("category", "").lower()
+    occupation = filters.get("occupation", "").lower()
+    state = filters.get("state", "").lower()
+    level = filters.get("level", "").lower()
+
+    all_schemes = list(collection.find())
+    matched_schemes = []
+
+    for scheme in all_schemes:
+
+        searchable_text = " ".join([
+            str(scheme.get("scheme_name", "")),
+            str(scheme.get("details", "")),
+            str(scheme.get("benefits", "")),
+            str(scheme.get("eligibility", "")),
+            str(scheme.get("schemeCategory", "")),
+            str(scheme.get("applicable_state", "")),
+            str(scheme.get("level", "")),
+            str(scheme.get("documents_required", "")),
+            str(scheme.get("scheme_status", ""))
+        ]).lower()
+
+        score = 0
+
+        if occupation and occupation in searchable_text:
+            score += 3
+
+        if category and category in searchable_text:
+            score += 2
+
+        if gender and gender in searchable_text:
+            score += 1
+
+        scheme_state = str(scheme.get("applicable_state", "")).lower()
+        if state:
+            if state in scheme_state:
+                score += 3
+            elif "all" in scheme_state or "central" in scheme_state:
+                score += 2
+
+        if level and level in searchable_text:
+            score += 2
+
+        if age:
+            try:
+                age_val = int(age)
+                eligibility_text = str(scheme.get("eligibility", "")).lower()
+
+                if str(age_val) in eligibility_text:
+                    score += 2
+                if "student" in eligibility_text and age_val <= 25:
+                    score += 2
+                if "senior" in eligibility_text and age_val >= 60:
+                    score += 2
+            except:
+                pass
+
+        if score > 0:
+            scheme_copy = dict(scheme)
+            scheme_copy["match_score"] = score
+            matched_schemes.append(scheme_copy)
+
+    matched_schemes.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+
+    return matched_schemes if matched_schemes else all_schemes
+
+
+# =====================================================
+# ---------------- HOME SEARCH ------------------------
+# =====================================================
+
+@app.route("/")
+def home():
+
+    search_query = request.args.get("search", "").strip()
+
+    if search_query:
+        words = re.split(r"\s+", search_query)
+
+        query_conditions = []
+        for word in words:
+            regex = {"$regex": word, "$options": "i"}
+            query_conditions.append({
+                "$or": [
+                    {"scheme_name": regex},
+                    {"details": regex},
+                    {"benefits": regex},
+                    {"eligibility": regex},
+                    {"schemeCategory": regex},
+                    {"applicable_state": regex},
+                    {"documents_required": regex},
+                    {"scheme_status": regex}
+                ]
+            })
+
+        all_schemes = list(collection.find({"$and": query_conditions}))
+    else:
+        all_schemes = list(collection.find())
+
+    ongoing = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "ongoing"]
+    upcoming = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "upcoming"]
+    expired = [s for s in all_schemes if str(s.get("scheme_status", "")).lower() == "expired"]
+
+    return render_template(
+        "index.html",
+        ongoing_schemes=ongoing,
+        upcoming_schemes=upcoming,
+        expired_schemes=expired,
+        search_query=search_query
+    )
+
+
+# =====================================================
+# ---------------- API SEARCH -------------------------
+# =====================================================
+
+@app.route("/api/search", methods=["POST"])
+def api_search():
+    filters = request.json
+    matched = match_schemes(filters)
+
+    for scheme in matched:
+        scheme["_id"] = str(scheme["_id"])
+
+    return jsonify(matched)
+
+# =============eligibility check=================
+from flask import request, jsonify
+from datetime import datetime
+import re
+
+@app.route("/api/eligibility", methods=["POST"])
+def eligibility_api():
+
+    data = request.get_json()
+
+    keywords = []
+
+    # Collect non-empty fields as keywords
+    for field in ["age", "gender", "category", "employment",
+                  "education", "disability", "state"]:
+        value = data.get(field)
+        if value:
+            keywords.append(str(value).strip())
+
+    query_conditions = []
+
+    for word in keywords:
+        regex = {"$regex": word, "$options": "i"}
+        query_conditions.append({
+            "$or": [
+                {"scheme_name": regex},
+                {"details": regex},
+                {"benefits": regex},
+                {"eligibility": regex},
+                {"schemeCategory": regex},
+                {"applicable_state": regex},
+                {"documents_required": regex}
+            ]
+        })
+
+    # Base filter: show only ongoing & upcoming
+    base_filter = {
+        "scheme_status": {"$in": ["Ongoing", "Upcoming"]}
+    }
+
+    if query_conditions:
+        final_query = {
+            "$and": [base_filter] + query_conditions
+        }
+        schemes = list(collection.find(final_query))
+    else:
+        schemes = list(collection.find(base_filter))
+
+    # 🔥 ALWAYS RETURN OUTPUT (Fallback)
+    if not schemes:
+        schemes = list(collection.find(base_filter).limit(20))
+
+    # Convert ObjectId
+    for scheme in schemes:
+        scheme["_id"] = str(scheme["_id"])
+
+    return jsonify(schemes)
+
+# =====================================================
+# ---------------- VIEW DETAILS -----------------------
+# =====================================================
+
+@app.route("/scheme/<scheme_id>")
+def scheme_details(scheme_id):
+    try:
+        scheme = collection.find_one({"_id": ObjectId(scheme_id)})
+
+        if not scheme:
+            return "Scheme not found", 404
+
+        scheme["_id"] = str(scheme["_id"])
+        existing = saved_collection.find_one({"scheme_id": scheme_id})
+        is_saved = True if existing else False
+
+        return render_template("save_scheme.html",
+                               scheme=scheme,
+                               is_saved=is_saved)
+    except:
+        return "Invalid Scheme ID", 400
+
+
+
+# =====================================================
+# ---------------- SAVE SCHEME ------------------------
+# =====================================================
+
+@app.route("/save_scheme", methods=["POST"])
+def save_scheme():
+
+    if "user_id" not in session:
+        return {"status": "login_required"}
+
+    data = request.json
+    scheme_id = data.get("scheme_id")
+
+    # Prevent duplicate saves
+    existing = saved_collection.find_one({
+        "scheme_id": scheme_id,
+        "user_id": session["user_id"]
+    })
+
+    if existing:
+        return {"status": "exists"}
+
+    # Just store reference instead of full scheme
+    saved_collection.insert_one({
+        "scheme_id": scheme_id,
+        "user_id": session["user_id"]
+    })
+
+    return {"status": "success"}
+
+# =====================================================
+# ---------------- VIEW SAVED -------------------------
+# =====================================================
+
+from bson import ObjectId
+
+@app.route("/saved_schemes")
+def view_saved():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    saved_items = list(saved_collection.find({
+        "user_id": session["user_id"]
+    }))
+
+    if not saved_items:
+        return render_template("saved_schemes.html", schemes=[])
+
+    scheme_ids = []
+
+    for item in saved_items:
+        try:
+            scheme_ids.append(ObjectId(item["scheme_id"]))
+        except:
+            scheme_ids.append(item["scheme_id"])
+
+    full_schemes = list(collection.find({
+        "_id": {"$in": scheme_ids}
+    }))
+
+    for scheme in full_schemes:
+        scheme["_id"] = str(scheme["_id"])
+
+    return render_template(
+        "saved_schemes.html",
+        schemes=full_schemes
+    )
+# =====================================================
+# ---------------- DELETE SAVED -----------------------
+# =====================================================
+
+
+@app.route("/delete_saved/<scheme_id>", methods=["POST"])
+def delete_saved(scheme_id):
+
+    if "user_id" not in session:
+        return {"status": "login_required"}
+
+    saved_collection.delete_one({
+        "scheme_id": scheme_id,
+        "user_id": session["user_id"]
+    })
+
+    return {"status": "deleted"}
+
+
+@app.route("/api/eligibility", methods=["POST"])
+def check_eligibility():
+
+    data = request.get_json()
+
+    age = data.get("age")
+    gender = data.get("gender")
+    category = data.get("category")
+    occupation = data.get("occupation")
+    level = data.get("level")
+    state = data.get("state")
+
+    query = {}
+
+    # Level filter
+    if level:
+        query["level"] = level
+
+    # State filter (only if State level selected)
+    if level == "State" and state:
+        query["applicable_state"] = {
+            "$regex": state,
+            "$options": "i"
+        }
+
+    # Build OR conditions (soft matching)
+    or_conditions = []
+
+    if occupation:
+        or_conditions.append({
+            "eligibility": {"$regex": occupation, "$options": "i"}
+        })
+
+    if category:
+        or_conditions.append({
+            "eligibility": {"$regex": category, "$options": "i"}
+        })
+
+    if gender:
+        or_conditions.append({
+            "eligibility": {"$regex": gender, "$options": "i"}
+        })
+
+    if age:
+        or_conditions.append({
+            "eligibility": {"$regex": str(age), "$options": "i"}
+        })
+
+    if or_conditions:
+        query["$or"] = or_conditions
+
+    # First attempt → strict query
+    matched_schemes = list(saved_collection.find(query).limit(20))
+
+    # If nothing found → relax filters (remove eligibility matching)
+    if len(matched_schemes) == 0:
+        relaxed_query = {}
+
+        if level:
+            relaxed_query["level"] = level
+
+        if level == "State" and state:
+            relaxed_query["applicable_state"] = {
+                "$regex": state,
+                "$options": "i"
+            }
+
+        matched_schemes = list(
+            saved_collection.find(relaxed_query).limit(20)
+        )
+
+    # If STILL nothing → return latest 10 schemes
+    if len(matched_schemes) == 0:
+        matched_schemes = list(
+            saved_collection.find().limit(10)
+        )
+
+    # Convert ObjectId to string
+    for scheme in matched_schemes:
+        scheme["_id"] = str(scheme["_id"])
+
+    return jsonify(matched_schemes)
+
+
+# ---------------- RUN SERVER -------------S---
+if __name__ == "__main__":
+    app.run(debug=True)
